@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Bunyeok | PDF Translation SSR Demo</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=Source+Serif+4:wght@500;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="{{ url_for('static', path='/styles.css') }}" />
+  </head>
+  <body>
+    <main class="page-shell">
+      <section class="hero">
+        <div class="hero-copy">
+          <p class="eyebrow">BUNYEOK</p>
+          <h1>PDF를 올리고, 진행도를 보면서, 번역된 마크다운을 바로 받는 Python SSR 화면</h1>
+          <p class="hero-text">
+            FastAPI 템플릿으로 서버 렌더링하고, 백그라운드에서 PDF를 파싱한 뒤
+            LangChain으로 번역합니다. 완료되면 MD 파일을 즉시 내려받을 수 있습니다.
+          </p>
+        </div>
+        <aside class="flow-card">
+          <p class="flow-title">Flow</p>
+          <ol>
+            <li>1. PDF 업로드</li>
+            <li>2. 텍스트 추출 및 청크 분리</li>
+            <li>3. LangChain 번역 실행</li>
+            <li>4. 진행도 polling 표시</li>
+            <li>5. 번역된 MD 다운로드</li>
+          </ol>
+        </aside>
+      </section>
+
+      <section class="dashboard">
+        <article class="panel">
+          <div class="panel-header">
+            <div>
+              <p class="eyebrow accent">PDF Translation</p>
+              <h2>PDF 업로드 후 바로 번역</h2>
+              <p class="panel-text">
+                서버에서 PDF를 파싱한 뒤 순차 번역하고, 완료되면 마크다운 파일로
+                내려받을 수 있습니다.
+              </p>
+            </div>
+            <span class="badge">FastAPI + Jinja2</span>
+          </div>
+
+          <form id="translation-form" class="form-grid">
+            <label class="field">
+              <span>PDF 문서</span>
+              <input id="file-input" name="file" type="file" accept="application/pdf" />
+            </label>
+
+            <label class="field">
+              <span>목표 언어</span>
+              <input
+                id="target-language"
+                name="target_language"
+                type="text"
+                value="{{ default_target_language }}"
+                placeholder="예: Korean, English, Japanese"
+              />
+            </label>
+
+            {% if not translation_enabled %}
+            <div class="alert error">
+              <code>OPENAI_API_KEY</code>를 설정하거나 <code>MOCK_TRANSLATION=true</code>로
+              실행하면 번역을 시작할 수 있습니다.
+            </div>
+            {% endif %}
+
+            <div id="form-error" class="alert error hidden"></div>
+
+            <button type="submit" id="submit-button" {% if not translation_enabled %}disabled{% endif %}>
+              번역 시작
+            </button>
+          </form>
+        </article>
+
+        <article class="panel panel-dark">
+          <div class="panel-header">
+            <div>
+              <p class="eyebrow accent-soft">Live Progress</p>
+              <h2>번역 진행도</h2>
+            </div>
+            <span class="badge dark" id="status-badge">준비됨</span>
+          </div>
+
+          <div class="status-card">
+            <div class="status-row">
+              <span id="status-message">PDF를 업로드하면 진행 상황이 여기에 표시됩니다.</span>
+              <strong id="status-progress">0%</strong>
+            </div>
+            <div class="progress-track">
+              <div class="progress-fill" id="progress-fill"></div>
+            </div>
+
+            <dl class="stats-grid">
+              <div class="stat-card">
+                <dt>파일명</dt>
+                <dd id="stat-filename">-</dd>
+              </div>
+              <div class="stat-card">
+                <dt>목표 언어</dt>
+                <dd id="stat-language">{{ default_target_language }}</dd>
+              </div>
+              <div class="stat-card">
+                <dt>소스 페이지</dt>
+                <dd id="stat-pages">-</dd>
+              </div>
+              <div class="stat-card">
+                <dt>번역 청크</dt>
+                <dd id="stat-chunks">-</dd>
+              </div>
+            </dl>
+
+            <div id="job-error" class="alert error hidden"></div>
+
+            <div id="result-block" class="hidden">
+              <a id="download-link" class="download-link" href="#">번역된 MD 다운로드</a>
+              <div class="preview-card">
+                <p class="preview-title">Preview</p>
+                <pre id="preview-text"></pre>
+              </div>
+            </div>
+
+            <p class="status-footnote">
+              진행률은 1.2초 간격으로 polling 합니다. 완료되면 다운로드 링크가 즉시 나타납니다.
+            </p>
+          </div>
+        </article>
+      </section>
+    </main>
+
+    <script>
+      const form = document.getElementById("translation-form");
+      const fileInput = document.getElementById("file-input");
+      const targetLanguageInput = document.getElementById("target-language");
+      const formError = document.getElementById("form-error");
+      const submitButton = document.getElementById("submit-button");
+      const statusBadge = document.getElementById("status-badge");
+      const statusMessage = document.getElementById("status-message");
+      const statusProgress = document.getElementById("status-progress");
+      const progressFill = document.getElementById("progress-fill");
+      const jobError = document.getElementById("job-error");
+      const resultBlock = document.getElementById("result-block");
+      const downloadLink = document.getElementById("download-link");
+      const previewText = document.getElementById("preview-text");
+      const statFilename = document.getElementById("stat-filename");
+      const statLanguage = document.getElementById("stat-language");
+      const statPages = document.getElementById("stat-pages");
+      const statChunks = document.getElementById("stat-chunks");
+
+      const labels = {
+        queued: "대기 중",
+        extracting: "PDF 추출 중",
+        translating: "번역 중",
+        completed: "완료",
+        failed: "실패",
+      };
+
+      let pollTimer = null;
+
+      function showElement(element, visible) {
+        element.classList.toggle("hidden", !visible);
+      }
+
+      function setError(element, message) {
+        element.textContent = message || "";
+        showElement(element, Boolean(message));
+      }
+
+      function applyJob(job, jobId) {
+        statusBadge.textContent = labels[job.status] || "알 수 없음";
+        statusMessage.textContent = job.message;
+        statusProgress.textContent = `${job.progress}%`;
+        progressFill.style.width = `${job.progress}%`;
+        statFilename.textContent = job.filename || "-";
+        statLanguage.textContent = job.target_language || "-";
+        statPages.textContent = job.source_page_count ?? "-";
+        statChunks.textContent = job.chunk_count ?? "-";
+        setError(jobError, job.error || "");
+
+        if (job.has_download) {
+          downloadLink.href = `/api/jobs/${jobId}/download`;
+          previewText.textContent = job.preview || "";
+          showElement(resultBlock, true);
+        } else {
+          showElement(resultBlock, false);
+        }
+      }
+
+      async function pollJob(jobId) {
+        try {
+          const response = await fetch(`/api/jobs/${jobId}`, { cache: "no-store" });
+          const payload = await response.json();
+
+          if (!response.ok) {
+            throw new Error(payload.detail || "상태를 불러오지 못했습니다.");
+          }
+
+          applyJob(payload, jobId);
+
+          if (["queued", "extracting", "translating"].includes(payload.status)) {
+            pollTimer = window.setTimeout(() => pollJob(jobId), 1200);
+          }
+        } catch (error) {
+          setError(formError, error.message || "상태를 확인하는 중 오류가 발생했습니다.");
+        }
+      }
+
+      form.addEventListener("submit", async (event) => {
+        event.preventDefault();
+
+        if (!fileInput.files.length) {
+          setError(formError, "먼저 번역할 PDF 파일을 선택해 주세요.");
+          return;
+        }
+
+        if (pollTimer) {
+          window.clearTimeout(pollTimer);
+        }
+
+        setError(formError, "");
+        setError(jobError, "");
+        showElement(resultBlock, false);
+        submitButton.disabled = true;
+        submitButton.textContent = "작업 시작 중...";
+
+        const body = new FormData();
+        body.append("file", fileInput.files[0]);
+        body.append("target_language", targetLanguageInput.value || "Korean");
+
+        try {
+          const response = await fetch("/api/jobs", {
+            method: "POST",
+            body,
+          });
+
+          const payload = await response.json();
+
+          if (!response.ok) {
+            throw new Error(payload.detail || "번역 작업을 시작하지 못했습니다.");
+          }
+
+          applyJob(payload.job, payload.job_id);
+          pollJob(payload.job_id);
+        } catch (error) {
+          setError(formError, error.message || "번역 요청 중 오류가 발생했습니다.");
+        } finally {
+          submitButton.disabled = false;
+          submitButton.textContent = "번역 시작";
+        }
+      });
+
+      fileInput.addEventListener("change", () => {
+        const file = fileInput.files[0];
+        statFilename.textContent = file ? file.name : "-";
+      });
+
+      targetLanguageInput.addEventListener("input", () => {
+        statLanguage.textContent = targetLanguageInput.value || "-";
+      });
+    </script>
+  </body>
+</html>

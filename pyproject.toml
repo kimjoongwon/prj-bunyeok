@@ -1,0 +1,21 @@
+[project]
+name = "bunyeok"
+version = "0.1.0"
+description = "Minimal SSR PDF translation demo with FastAPI and LangChain"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+  "fastapi>=0.115.0",
+  "jinja2>=3.1.4",
+  "langchain-community>=0.3.0",
+  "langchain-core>=0.3.0",
+  "langchain-openai>=0.2.0",
+  "langchain-text-splitters>=0.3.0",
+  "pypdf>=5.0.0",
+  "python-multipart>=0.0.9",
+  "uvicorn[standard]>=0.32.0",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
