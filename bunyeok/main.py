@@ -24,12 +24,17 @@ def translation_enabled() -> bool:
 
 @app.get("/", response_class=HTMLResponse)
 async def home(request: Request) -> HTMLResponse:
+    server_api_key_available = bool(os.getenv("OPENAI_API_KEY"))
+    mock_translation = os.getenv("MOCK_TRANSLATION", "false").lower() == "true"
+
     return templates.TemplateResponse(
         request,
         "index.html",
         {
             "translation_enabled": translation_enabled(),
             "default_target_language": "Korean",
+            "server_api_key_available": server_api_key_available,
+            "mock_translation": mock_translation,
         },
     )
 
@@ -39,6 +44,7 @@ async def create_job(
     background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
     target_language: str = Form("Korean"),
+    openai_api_key: str = Form(""),
 ) -> JSONResponse:
     filename = file.filename or "document.pdf"
     looks_like_pdf = filename.lower().endswith(".pdf") or file.content_type == "application/pdf"
@@ -59,6 +65,7 @@ async def create_job(
         filename,
         file_bytes,
         target_language.strip() or "Korean",
+        openai_api_key.strip() or None,
     )
 
     return JSONResponse(

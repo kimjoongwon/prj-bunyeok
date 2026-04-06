@@ -185,6 +185,7 @@ code {
 }
 
 .field input[type="text"],
+.field input[type="password"],
 .field input[type="file"] {
   width: 100%;
   border-radius: 20px;
@@ -192,6 +193,13 @@ code {
   background: #f8fafc;
   padding: 14px 16px;
   font: inherit;
+}
+
+.field-help {
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 400;
+  line-height: 1.5;
 }
 
 .field input[type="file"]::file-selector-button {
@@ -292,10 +300,22 @@ button:disabled {
   border: 1px solid #fecdd3;
 }
 
+.alert.info {
+  color: #1d4ed8;
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+}
+
 .panel-dark .alert.error {
   color: #fecdd3;
   background: rgba(244, 63, 94, 0.12);
   border-color: rgba(251, 113, 133, 0.28);
+}
+
+.panel-dark .alert.info {
+  color: #bfdbfe;
+  background: rgba(59, 130, 246, 0.12);
+  border-color: rgba(96, 165, 250, 0.28);
 }
 
 .download-link {

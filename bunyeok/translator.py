@@ -61,7 +61,13 @@ def render_mock_translation(content: str, target_language: str) -> str:
     )
 
 
-def run_translation_job(job_id: str, filename: str, file_bytes: bytes, target_language: str) -> None:
+def run_translation_job(
+    job_id: str,
+    filename: str,
+    file_bytes: bytes,
+    target_language: str,
+    openai_api_key: str | None = None,
+) -> None:
     temp_path: Path | None = None
 
     try:
@@ -88,9 +94,10 @@ def run_translation_job(job_id: str, filename: str, file_bytes: bytes, target_la
             raise RuntimeError("PDF 내용을 번역 가능한 청크로 나누지 못했습니다.")
 
         mock_mode = os.getenv("MOCK_TRANSLATION", "false").lower() == "true"
+        api_key = openai_api_key or os.getenv("OPENAI_API_KEY")
 
-        if not mock_mode and not os.getenv("OPENAI_API_KEY"):
-            raise RuntimeError("OPENAI_API_KEY가 없어 번역을 실행할 수 없습니다.")
+        if not mock_mode and not api_key:
+            raise RuntimeError("OpenAI API 키가 없어 번역을 실행할 수 없습니다.")
 
         chain = None
 
@@ -98,6 +105,7 @@ def run_translation_job(job_id: str, filename: str, file_bytes: bytes, target_la
             chain = (
                 TRANSLATION_PROMPT
                 | ChatOpenAI(
+                    api_key=api_key,
                     model=os.getenv("OPENAI_MODEL", "gpt-4.1-mini"),
                     temperature=0.2,
                 )

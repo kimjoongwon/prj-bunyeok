@@ -20,7 +20,8 @@
           <h1>PDF를 올리고, 진행도를 보면서, 번역된 마크다운을 바로 받는 Python SSR 화면</h1>
           <p class="hero-text">
             FastAPI 템플릿으로 서버 렌더링하고, 백그라운드에서 PDF를 파싱한 뒤
-            LangChain으로 번역합니다. 완료되면 MD 파일을 즉시 내려받을 수 있습니다.
+            LangChain으로 번역합니다. 화면에 입력한 OpenAI API Key로 요청을 보내고,
+            완료되면 MD 파일을 즉시 내려받을 수 있습니다.
           </p>
         </div>
         <aside class="flow-card">
@@ -66,16 +67,35 @@
               />
             </label>
 
-            {% if not translation_enabled %}
+            <label class="field">
+              <span>OpenAI API Key</span>
+              <input
+                id="openai-api-key"
+                name="openai_api_key"
+                type="password"
+                placeholder="sk-..."
+                autocomplete="off"
+              />
+              <small class="field-help">입력한 키는 저장하지 않고 이번 번역 요청에만 사용합니다.</small>
+            </label>
+
+            {% if mock_translation %}
+            <div class="alert info">
+              현재는 <code>MOCK_TRANSLATION=true</code> 상태입니다. 실제 LLM 호출 대신 mock 결과를 반환합니다.
+            </div>
+            {% elif not server_api_key_available %}
             <div class="alert error">
-              <code>OPENAI_API_KEY</code>를 설정하거나 <code>MOCK_TRANSLATION=true</code>로
-              실행하면 번역을 시작할 수 있습니다.
+              이 앱은 화면에 입력한 OpenAI API Key로 번역 요청을 보냅니다. 키를 입력한 뒤 번역을 시작해 주세요.
+            </div>
+            {% else %}
+            <div class="alert info">
+              화면에 키를 입력하면 해당 키로 요청하고, 비워두면 서버 환경변수 <code>OPENAI_API_KEY</code>를 사용합니다.
             </div>
             {% endif %}
 
             <div id="form-error" class="alert error hidden"></div>
 
-            <button type="submit" id="submit-button" {% if not translation_enabled %}disabled{% endif %}>
+            <button type="submit" id="submit-button">
               번역 시작
             </button>
           </form>
@@ -140,6 +160,7 @@
       const form = document.getElementById("translation-form");
       const fileInput = document.getElementById("file-input");
       const targetLanguageInput = document.getElementById("target-language");
+      const apiKeyInput = document.getElementById("openai-api-key");
       const formError = document.getElementById("form-error");
       const submitButton = document.getElementById("submit-button");
       const statusBadge = document.getElementById("status-badge");
@@ -154,6 +175,8 @@
       const statLanguage = document.getElementById("stat-language");
       const statPages = document.getElementById("stat-pages");
       const statChunks = document.getElementById("stat-chunks");
+      const serverApiKeyAvailable = {{ "true" if server_api_key_available else "false" }};
+      const mockTranslation = {{ "true" if mock_translation else "false" }};
 
       const labels = {
         queued: "대기 중",
@@ -221,6 +244,12 @@
           return;
         }
 
+        if (!mockTranslation && !serverApiKeyAvailable && !apiKeyInput.value.trim()) {
+          setError(formError, "OpenAI API Key를 입력해 주세요.");
+          apiKeyInput.focus();
+          return;
+        }
+
         if (pollTimer) {
           window.clearTimeout(pollTimer);
         }
@@ -234,6 +263,7 @@
         const body = new FormData();
         body.append("file", fileInput.files[0]);
         body.append("target_language", targetLanguageInput.value || "Korean");
+        body.append("openai_api_key", apiKeyInput.value || "");
 
         try {
           const response = await fetch("/api/jobs", {
