@@ -7,7 +7,7 @@ Python SSR 기반의 아주 작은 PDF 번역 데모입니다.
 - 번역 체인: LangChain + OpenAI
 - 인증 방식: 화면에 입력한 OpenAI API Key로 요청
 - 입력: PDF 업로드
-- 출력: 번역된 Markdown 다운로드
+- 출력: 페이지별 Markdown 파일 저장 + 통합 Markdown 다운로드
 - 진행도: 작업 상태 polling
 
 ## 실행 방법
@@ -43,9 +43,16 @@ MOCK_TRANSLATION=true
 
 - `bunyeok/main.py`: FastAPI 앱, SSR 화면, API 엔드포인트
 - `bunyeok/job_store.py`: 데모용 인메모리 작업 저장소
-- `bunyeok/translator.py`: PDF 파싱 + LangChain 번역 체인
+- `bunyeok/translator.py`: PDF 페이지 단위 파싱 + 페이지별 LangChain 번역 + 파일 저장
 - `templates/index.html`: SSR 화면 템플릿
 - `static/styles.css`: 스타일
+
+## 저장 결과
+
+번역이 완료되면 프로젝트 루트의 `outputs/` 아래에 작업별 폴더가 생성됩니다.
+
+- `page-001.md`, `page-002.md` ...: 페이지별 번역 결과
+- `index.md`: 전체 페이지를 합친 통합본
 
 ## 참고
 

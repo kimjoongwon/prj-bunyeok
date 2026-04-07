@@ -285,6 +285,7 @@ button:disabled {
   font-size: 0.95rem;
   font-weight: 500;
   color: white;
+  word-break: break-word;
 }
 
 .alert {
@@ -327,6 +328,13 @@ button:disabled {
   background: white;
   font-weight: 700;
   text-decoration: none;
+}
+
+.result-meta {
+  margin-top: 10px;
+  color: #97a3b6;
+  font-size: 0.86rem;
+  line-height: 1.6;
 }
 
 .preview-card {

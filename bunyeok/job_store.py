@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from threading import Lock
 from typing import Any
@@ -25,7 +25,9 @@ class TranslationJob:
     error: str | None = None
     translated_markdown: str | None = None
     source_page_count: int | None = None
-    chunk_count: int | None = None
+    saved_page_count: int | None = None
+    output_dir: str | None = None
+    page_files: list[str] = field(default_factory=list)
     download_filename: str | None = None
 
 

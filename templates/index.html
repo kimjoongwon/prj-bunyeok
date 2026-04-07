@@ -17,21 +17,21 @@
       <section class="hero">
         <div class="hero-copy">
           <p class="eyebrow">BUNYEOK</p>
-          <h1>PDF를 올리고, 진행도를 보면서, 번역된 마크다운을 바로 받는 Python SSR 화면</h1>
+          <h1>PDF를 올리고, 페이지별로 번역하고, 폴더에 페이지 단위 Markdown 파일을 저장하는 Python SSR 화면</h1>
           <p class="hero-text">
-            FastAPI 템플릿으로 서버 렌더링하고, 백그라운드에서 PDF를 파싱한 뒤
+            FastAPI 템플릿으로 서버 렌더링하고, 백그라운드에서 PDF를 페이지별로 파싱한 뒤
             LangChain으로 번역합니다. 화면에 입력한 OpenAI API Key로 요청을 보내고,
-            완료되면 MD 파일을 즉시 내려받을 수 있습니다.
+            완료되면 각 페이지가 별도 Markdown 파일로 저장됩니다.
           </p>
         </div>
         <aside class="flow-card">
           <p class="flow-title">Flow</p>
           <ol>
             <li>1. PDF 업로드</li>
-            <li>2. 텍스트 추출 및 청크 분리</li>
-            <li>3. LangChain 번역 실행</li>
+            <li>2. 페이지별 텍스트 추출</li>
+            <li>3. 페이지 단위 LangChain 번역</li>
             <li>4. 진행도 polling 표시</li>
-            <li>5. 번역된 MD 다운로드</li>
+            <li>5. `outputs/...` 폴더에 페이지별 MD 저장</li>
           </ol>
         </aside>
       </section>
@@ -41,10 +41,10 @@
           <div class="panel-header">
             <div>
               <p class="eyebrow accent">PDF Translation</p>
-              <h2>PDF 업로드 후 바로 번역</h2>
+              <h2>PDF 업로드 후 페이지 단위 저장</h2>
               <p class="panel-text">
-                서버에서 PDF를 파싱한 뒤 순차 번역하고, 완료되면 마크다운 파일로
-                내려받을 수 있습니다.
+                서버에서 PDF를 페이지별로 파싱하고 번역한 뒤, 결과를 폴더에
+                페이지 단위 Markdown 파일로 저장합니다. 통합본은 미리보기와 다운로드용으로 함께 제공합니다.
               </p>
             </div>
             <span class="badge">FastAPI + Jinja2</span>
@@ -105,7 +105,7 @@
           <div class="panel-header">
             <div>
               <p class="eyebrow accent-soft">Live Progress</p>
-              <h2>번역 진행도</h2>
+              <h2>페이지별 번역 진행도</h2>
             </div>
             <span class="badge dark" id="status-badge">준비됨</span>
           </div>
@@ -133,15 +133,20 @@
                 <dd id="stat-pages">-</dd>
               </div>
               <div class="stat-card">
-                <dt>번역 청크</dt>
-                <dd id="stat-chunks">-</dd>
+                <dt>저장된 페이지</dt>
+                <dd id="stat-saved-pages">-</dd>
+              </div>
+              <div class="stat-card">
+                <dt>저장 폴더</dt>
+                <dd id="stat-output-dir">-</dd>
               </div>
             </dl>
 
             <div id="job-error" class="alert error hidden"></div>
 
             <div id="result-block" class="hidden">
-              <a id="download-link" class="download-link" href="#">번역된 MD 다운로드</a>
+              <a id="download-link" class="download-link" href="#">통합 MD 다운로드</a>
+              <p class="result-meta">페이지별 파일은 아래 폴더에 저장되고, 미리보기는 통합본 기준입니다.</p>
               <div class="preview-card">
                 <p class="preview-title">Preview</p>
                 <pre id="preview-text"></pre>
@@ -149,7 +154,7 @@
             </div>
 
             <p class="status-footnote">
-              진행률은 1.2초 간격으로 polling 합니다. 완료되면 다운로드 링크가 즉시 나타납니다.
+              진행률은 1.2초 간격으로 polling 합니다. 완료되면 `outputs/...` 폴더에 페이지별 Markdown 파일이 저장됩니다.
             </p>
           </div>
         </article>
@@ -174,7 +179,8 @@
       const statFilename = document.getElementById("stat-filename");
       const statLanguage = document.getElementById("stat-language");
       const statPages = document.getElementById("stat-pages");
-      const statChunks = document.getElementById("stat-chunks");
+      const statSavedPages = document.getElementById("stat-saved-pages");
+      const statOutputDir = document.getElementById("stat-output-dir");
       const serverApiKeyAvailable = {{ "true" if server_api_key_available else "false" }};
       const mockTranslation = {{ "true" if mock_translation else "false" }};
 
@@ -205,7 +211,8 @@
         statFilename.textContent = job.filename || "-";
         statLanguage.textContent = job.target_language || "-";
         statPages.textContent = job.source_page_count ?? "-";
-        statChunks.textContent = job.chunk_count ?? "-";
+        statSavedPages.textContent = job.saved_page_count ?? "-";
+        statOutputDir.textContent = job.output_dir || "-";
         setError(jobError, job.error || "");
 
         if (job.has_download) {
